@@ -1,0 +1,88 @@
+    "LaunchTemplateData": {
+        "EbsOptimized": false,
+        "BlockDeviceMappings": [
+            {
+                "DeviceName": "/dev/xvda",
+                "Ebs": {
+                    "Encrypted": false,
+                    "DeleteOnTermination": true,
+                    "SnapshotId": "snap-0afbf26a63a8c6d23",
+                    "VolumeSize": 30,
+                    "VolumeType": "gp2"
+                }
+            }
+        ],
+        "NetworkInterfaces": [
+            {
+                "AssociatePublicIpAddress": true,
+                "DeleteOnTermination": false,
+                "Description": "",
+                "DeviceIndex": 0,
+                "Groups": [
+                    "sg-01c98ae6de0384ec8"
+                ],
+                "InterfaceType": "interface",
+                "Ipv6Addresses": [],
+                "PrivateIpAddresses": [
+                    {
+                        "Primary": true,
+                        "PrivateIpAddress": "172.31.43.120"
+                    }
+                ],
+                "SubnetId": "subnet-06390a008023d9992",
+                "NetworkCardIndex": 0
+            }
+        ],
+        "ImageId": "ami-08056d04e24f84e34",
+        "InstanceType": "c5a.4xlarge",
+        "KeyName": "aws-eun1",
+        "Monitoring": {
+            "Enabled": false
+        },
+        "Placement": {
+            "AvailabilityZone": "eu-north-1b",
+            "GroupName": "",
+            "Tenancy": "default"
+        },
+        "DisableApiTermination": false,
+        "InstanceInitiatedShutdownBehavior": "stop",
+        "TagSpecifications": [
+            {
+                "ResourceType": "instance",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "build6"
+                    }
+                ]
+            }
+        ],
+        "CpuOptions": {
+            "CoreCount": 8,
+            "ThreadsPerCore": 2
+        },
+        "CapacityReservationSpecification": {
+            "CapacityReservationPreference": "open"
+        },
+        "HibernationOptions": {
+            "Configured": false
+        },
+        "MetadataOptions": {
+            "HttpTokens": "optional",
+            "HttpPutResponseHopLimit": 1,
+            "HttpEndpoint": "enabled",
+            "HttpProtocolIpv6": "disabled",
+            "InstanceMetadataTags": "disabled"
+        },
+        "EnclaveOptions": {
+            "Enabled": false
+        },
+        "PrivateDnsNameOptions": {
+            "HostnameType": "ip-name",
+            "EnableResourceNameDnsARecord": false,
+            "EnableResourceNameDnsAAAARecord": false
+        },
+        "MaintenanceOptions": {
+            "AutoRecovery": "default"
+        }
+    }

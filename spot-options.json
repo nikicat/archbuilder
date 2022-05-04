@@ -1,0 +1,6 @@
+{
+  "MarketType": "spot",
+  "SpotOptions": {
+    "SpotInstanceType": "one-time"
+  }
+}
