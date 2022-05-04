@@ -1,7 +1,9 @@
-#!/bin/sh -exv
+#!/bin/bash -exv
 
-TYPE=c5a.4xlarge
 VCPUS=16
+TYPE=c5a.4xlarge
+VCPUS=32
+TYPE=c5a.8xlarge
 J=$(($VCPUS*2))
 AMI=ami-08056d04e24f84e34  # amzn2-ami-ecs-hvm-2.0.20220421-x86_64-ebs
 spot=true

@@ -4,10 +4,11 @@ RUN git clone https://github.com/nikicat/yay && cd yay && git checkout 9e325b55f
 
 FROM archlinux:base-devel
 
-RUN pacman -Sy --needed --noconfirm sudo git && echo -e 'y\ny' | pacman -Scc
+RUN pacman -Sy --needed --noconfirm sudo git perl && echo -e 'y\ny' | pacman -Scc
 RUN useradd builduser -m # Create the builduser
 RUN passwd -d builduser # Delete the buildusers password
 RUN printf 'builduser ALL=(ALL) ALL\n' | tee -a /etc/sudoers # Allow the builduser passwordless sudo
+RUN ln -s /usr/bin/core_perl/pod2man /usr/bin/pod2man
 COPY --from=make-yay /yay/yay /bin/
 WORKDIR /home/builduser
 USER builduser
