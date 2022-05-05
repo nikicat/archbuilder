@@ -1,0 +1,3 @@
+[submodule "vendor/bash-spinner"]
+	path = vendor/bash-spinner
+	url = https://github.com/tlatsas/bash-spinner
