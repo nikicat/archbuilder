@@ -1,3 +1,0 @@
-[submodule "vendor/bash-spinner"]
-	path = vendor/bash-spinner
-	url = https://github.com/nikicat/bash-spinner

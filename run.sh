@@ -1,63 +1,67 @@
 #!/bin/sh -e
 
-source ./vendor/bash-spinner/spinner.sh
+source /usr/share/makepkg/util/message.sh
 
 ami="${AMI:-ami-08056d04e24f84e34}"  # amzn2-ami-ecs-hvm-2.0.20220421-x86_64-ebs
 spot=true
 install=y
+vcpus=32
 
 export AWS_PAGER=""
 
 function print_usage() {
-        echo "$0 [-c <vcpus>] <packages>"
-        echo " -c <vcpus> - count of VCPU to create VM instance with. Less vcpu - more efficient, but longer build. Default is 32."
+        echo "$0 [-c <vcpus>] [-d] [-h] <packages>"
+        echo "   -c <vcpus>   count of VCPU to create VM instance with. Less vcpu - more efficient, but longer build. Default is 32."
+        echo "   -d           download build package only (do not install)"
+        echo "   -h           show this help"
 }
 
 function parse_args() {
-        vcpus=32
-        to_shift=0
-        if [ "$1" = "-c" ]; then
-                vcpus=$2
-                to_shift=2
-        fi
-        case $vcpus in
-                4)
-                        type=c5a.xlarge
+        [ $# = 0 ] && print_usage && exit
+        while [[ $# -gt 0 ]]; do
+                case $1 in
+                -c)
+                        vcpus=$2
+                        shift
+                        shift
+                        valid_vcpus="4 8 16 32 64 96"
+                        if [[ ! " $valid_vcpus " =~ " $vcpus " ]]; then
+                                error "Invalid vcpus value. Possible values are ($valid_vcpus)"
+                                exit 1
+                        fi
+                        itype=c5a.$(($vcpus/4))xlarge
+                        [ $itype = c5a.1xlarge ] && itype=c5a.xlarge
                         ;;
-                8)
-                        type=c5a.2xlarge
+                -d)
+                        install=n
+                        shift
                         ;;
-                16)
-                        type=c5a.4xlarge
+                -h)
+                        print_usage
+                        exit 0
                         ;;
-                32)
-                        type=c5a.8xlarge
-                        ;;
-                48)
-                        type=c5a.12xlarge
-                        ;;
-                64)
-                        type=c5a.16xlarge
-                        ;;
-                96)
-                        type=c5a.24xlarge
-                        ;;
-                *)
-                        echo "Invalid vcpus value. Possible values are (4,8,16,32)"
+                -*)
+                        error "Unknown option $1"
                         exit 1
                         ;;
-        esac
-        j=$(($vcpus*2))
+                *)
+                        break
+                        ;;
+                esac
+        done
+        args="$@"
+        if [ $args = "" ]; then
+                print_usage
+                exit 1
+        fi
 }
 
 function cleanup() {
-        if jobs %_spinner 2>/dev/null; then
-                kill %_spinner && wait %_spinner || true
-        fi
+        #jobs %_spinner 2>/dev/null && kill %_spinner && wait %_spinner || true
         [ "$tmp_dir" != "" ] && rm -r "$tmp_dir"
         [ -e docker.sock ] && rm docker.sock
         if [ "$iid" != "" ]; then
-                echo "emergency terminating instance..."
+                warning "emergency terminating instance..."
                 aws ec2 terminate-instances --instance-id=$iid > /dev/null
         fi
         if [ "$spot_price" != "" ]
@@ -72,9 +76,8 @@ function cleanup() {
 
 function setup_keypair() {
         if [ ! -e ssh.pem ]; then
-                start_spinner "creating keypair..."
+                msg "Creating keypair..."
                 aws ec2 create-key-pair --key-name archbuild --query KeyMaterial --output text > ssh.pem
-                stop_spinner $?
         fi
         chmod go-rwx ssh.pem
 }
@@ -82,10 +85,9 @@ function setup_keypair() {
 function run_instance() {
         aws ec2 describe-security-groups --group-names archbuild >/dev/null || (aws ec2 create-security-group --group-name archbuild --description archbuild > /dev/null && aws ec2 authorize-security-group-ingress --group-name archbuild --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null)
         [ "$spot" = "true" ] && market_options="--instance-market-options file://spot-options.json"
-        start_spinner "creating instance..."
-        iid=$(aws ec2 run-instances --image-id $ami --instance-type $type --count 1 --key-name archbuild --security-groups archbuild --query 'Instances[0].InstanceId' $market_options --output text)
-        stop_spinner $?
-        start_spinner "waiting for instance to start..."
+        msg "Creating instance..."
+        iid=$(aws ec2 run-instances --image-id $ami --instance-type $itype --count 1 --key-name archbuild --security-groups archbuild --query 'Instances[0].InstanceId' $market_options --output text)
+        msg "Waiting for instance to start..."
         while true; do
                 state=$(aws ec2 describe-instances --filter Name=instance-id,Values=$iid --query 'Reservations[*].Instances[*].State.Name' --output text)
                 [ "$state" = "running" ] && break
@@ -94,28 +96,25 @@ function run_instance() {
         dns=$(aws ec2 describe-instances --instance-id $iid --query 'Reservations[0].Instances[0].PublicDnsName' --output text)
         az=$(aws ec2 describe-instances --instance-id $iid --query 'Reservations[0].Instances[0].Placement.AvailabilityZone' --output text)
         tstart=$(date +%s)
-        spot_price=$(aws ec2 describe-spot-price-history --instance-types=$type --availability-zone=$az --product-descriptions=Linux/UNIX --start-time=$tstart --end-time=$tstart --no-cli-pager  --query 'SpotPriceHistory[0].SpotPrice' --output text)
-        stop_spinner $?
+        spot_price=$(aws ec2 describe-spot-price-history --instance-types=$itype --availability-zone=$az --product-descriptions=Linux/UNIX --start-time=$tstart --end-time=$tstart --no-cli-pager  --query 'SpotPriceHistory[0].SpotPrice' --output text)
 }
 
 function connect_docker() {
-        start_spinner "connecting ssh..."
+        msg "Connecting ssh..."
         [ -e docker.sock ] && rm docker.sock
         ssh -i ./ssh.pem -fNT -L./docker.sock:/run/docker.sock -o "StrictHostKeyChecking no" -o "ExitOnForwardFailure yes" -o "ConnectionAttempts 5" -o "LogLevel ERROR" ec2-user@$dns
         export DOCKER_HOST=unix://./docker.sock
-        stop_spinner $?
 }
 
 function build_and_download() {
-        echo "building packages..."
-        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=-j$j --name archbuild nikicat/archbuild "$@"
-        start_spinner "downloading packages..."
+        msg "Building packages..."
+        local makeflags="-j$(($vcpus*2))"
+        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name archbuild nikicat/archbuild $args
+        msg "Downloading packages..."
         tmp_dir=$(mktemp -d -p ./)
         docker cp archbuild:/packages $tmp_dir
-        stop_spinner $?
-        start_spinner "terminating instance..."
+        msg "Terminating instance..."
         aws ec2 terminate-instances --instance-id=$iid > /dev/null
-        stop_spinner $?
         iid=
         if [ "$install" = y ]; then
                 sudo pacman -U $tmp_dir/packages/*
@@ -123,12 +122,8 @@ function build_and_download() {
         mv $tmp_dir/packages/* ./packages
 }
 
-if [ "$1" = "" ]; then
-        print_usage
-        exit
-fi
+colorize
 parse_args "$@"
-shift $to_shift
 trap cleanup EXIT
 trap echo INT
 setup_keypair
