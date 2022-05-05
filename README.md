@@ -1,6 +1,8 @@
 #archbuilder
 
-It's a pretty simple bash script plus docker image to run AUR builds on a EC2 instance.
+If you want to build ArchLinux AUR packages faster - this script could help.
+
+It runs AUR builds on a EC2 instance.
 
 What it does is
  - allocates ec2 instance

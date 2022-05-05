@@ -50,18 +50,23 @@ function parse_args() {
         j=$(($vcpus*2))
 }
 
-function cleanup()
-{
-        stop_spinner 0
+function cleanup() {
+        if jobs %_spinner 2>/dev/null; then
+                kill %_spinner && wait %_spinner || true
+        fi
         [ "$tmp_dir" != "" ] && rm -r "$tmp_dir"
         [ -e docker.sock ] && rm docker.sock
-        [ "$iid" != "" ] && aws ec2 terminate-instances --instance-id=$iid > /dev/null
+        if [ "$iid" != "" ]; then
+                echo "emergency terminating instance..."
+                aws ec2 terminate-instances --instance-id=$iid > /dev/null
+        fi
         if [ "$spot_price" != "" ]
         then
                 tend=$(date +%s)
                 time=$(($tend - $tstart))
                 cost=$(echo "scale=4;$time * $spot_price / 3600" | bc)
-                echo "Time: $time sec. Cost: \$$cost"
+                time_text=$(date -ud "@$time" +'%H:%M:%S')
+                echo "Total time: $time_text. Cost: \$$cost"
         fi
 }
 
@@ -104,10 +109,14 @@ function connect_docker() {
 function build_and_download() {
         echo "building packages..."
         docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=-j$j --name archbuild nikicat/archbuild "$@"
-        start_spinner "downloading pacakges..."
+        start_spinner "downloading packages..."
         tmp_dir=$(mktemp -d -p ./)
         docker cp archbuild:/packages $tmp_dir
         stop_spinner $?
+        start_spinner "terminating instance..."
+        aws ec2 terminate-instances --instance-id=$iid > /dev/null
+        stop_spinner $?
+        iid=
         if [ "$install" = y ]; then
                 sudo pacman -U $tmp_dir/packages/*
         fi
@@ -120,8 +129,9 @@ if [ "$1" = "" ]; then
 fi
 parse_args "$@"
 shift $to_shift
-setup_keypair
 trap cleanup EXIT
+trap echo INT
+setup_keypair
 run_instance
 connect_docker
 build_and_download "$@"
