@@ -8,7 +8,7 @@
 
 # Maintainer: Nikolay Bryskin <nbryskin@gmail.com>
 pkgname=archbuilder-git
-pkgver=r5.d57d73c
+pkgver=r6.e0bc456
 pkgrel=1
 pkgdesc="Build AUR packages on EC2"
 url="https://github.com/nikicat/archbuilder"
@@ -26,4 +26,5 @@ pkgver() {
 package() {
 	cd "$srcdir/${pkgname%-git}"
         install -Dm755 run.sh "$pkgdir"/usr/bin/archbuild
+        install -Dm644 spot-options.json "$pkgdir"/usr/share/archbuild/spot-options.json
 }

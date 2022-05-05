@@ -8,6 +8,7 @@ install=y
 vcpus=32
 sshkey=~/.local/archbuild/ssh.pem
 sockpath=~/.local/archbuild/docker.sock
+spot_options_path=${SPOT_OPTIONS_FILE:-/usr/share/archbuild/spot-options.json}
 
 export AWS_PAGER=""
 
@@ -90,7 +91,7 @@ function setup_keypair() {
 
 function run_instance() {
         aws ec2 describe-security-groups --group-names archbuild >/dev/null || (aws ec2 create-security-group --group-name archbuild --description archbuild > /dev/null && aws ec2 authorize-security-group-ingress --group-name archbuild --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null)
-        [ "$spot" = "true" ] && market_options="--instance-market-options file://spot-options.json"
+        [ "$spot" = "true" ] && market_options="--instance-market-options file://$spot_options_path"
         msg "Creating instance..."
         iid=$(aws ec2 run-instances --image-id $ami --instance-type $itype --count 1 --key-name archbuild --security-groups archbuild --query 'Instances[0].InstanceId' $market_options --output text)
         msg "Waiting for instance to start..."
