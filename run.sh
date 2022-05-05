@@ -33,8 +33,6 @@ function parse_args() {
                                 error "Invalid vcpus value. Possible values are ($valid_vcpus)"
                                 exit 1
                         fi
-                        itype=c5a.$(($vcpus/4))xlarge
-                        [ $itype = c5a.1xlarge ] && itype=c5a.xlarge
                         ;;
                 -d)
                         install=n
@@ -53,6 +51,8 @@ function parse_args() {
                         ;;
                 esac
         done
+        itype=c5a.$(($vcpus/4))xlarge
+        [ $itype = c5a.1xlarge ] && itype=c5a.xlarge
         args="$@"
         if [ $args = "" ]; then
                 print_usage
@@ -80,7 +80,7 @@ function cleanup() {
 function setup_keypair() {
         mkdir -p "$(dirname $sshkey)"
         if [ ! -e "$sshkey" ]; then
-                if aws ec2 describe-key-pairs --key-names $name >/dev/null; then
+                if aws ec2 describe-key-pairs --key-names $name >/dev/null 2>&1; then
                         msg "Deleting old keypair..."
                         aws ec2 delete-key-pair --key-name $name >/dev/null
                 fi
@@ -91,7 +91,10 @@ function setup_keypair() {
 }
 
 function run_instance() {
-        aws ec2 describe-security-groups --group-names $name >/dev/null || (aws ec2 create-security-group --group-name $name --description $name > /dev/null && aws ec2 authorize-security-group-ingress --group-name $name --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null)
+        if ! aws ec2 describe-security-groups --group-names $name >/dev/null 2>&1; then
+                aws ec2 create-security-group --group-name $name --description $name > /dev/null
+                aws ec2 authorize-security-group-ingress --group-name $name --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null
+        fi
         [ "$spot" = "true" ] && market_options="--instance-market-options file://$spot_options_path"
         msg "Creating instance..."
         iid=$(aws ec2 run-instances --image-id $ami --instance-type $itype --count 1 --key-name $name --security-groups $name --query 'Instances[0].InstanceId' $market_options --output text)
