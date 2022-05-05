@@ -6,9 +6,10 @@ ami="${AMI:-ami-08056d04e24f84e34}"  # amzn2-ami-ecs-hvm-2.0.20220421-x86_64-ebs
 spot=true
 install=y
 vcpus=32
-sshkey=~/.local/archbuild/ssh.pem
-sockpath=~/.local/archbuild/docker.sock
-spot_options_path=${SPOT_OPTIONS_FILE:-/usr/share/archbuild/spot-options.json}
+sshkey=~/.local/auruild/ssh.pem
+sockpath=~/.local/aurbuild/docker.sock
+spot_options_path=${SPOT_OPTIONS_FILE:-/usr/share/aurbuild/spot-options.json}
+name=aurbuild
 
 export AWS_PAGER=""
 
@@ -79,21 +80,21 @@ function cleanup() {
 function setup_keypair() {
         mkdir -p "$(dirname $sshkey)"
         if [ ! -e "$sshkey" ]; then
-                if aws ec2 describe-key-pairs --key-names archbuild >/dev/null; then
+                if aws ec2 describe-key-pairs --key-names $name >/dev/null; then
                         msg "Deleting old keypair..."
-                        aws ec2 delete-key-pair --key-name archbuild >/dev/null
+                        aws ec2 delete-key-pair --key-name $name >/dev/null
                 fi
                 msg "Creating keypair..."
-                aws ec2 create-key-pair --key-name archbuild --query KeyMaterial --output text > "$sshkey"
+                aws ec2 create-key-pair --key-name $name --query KeyMaterial --output text > "$sshkey"
                 chmod go-rwx "$sshkey"
         fi
 }
 
 function run_instance() {
-        aws ec2 describe-security-groups --group-names archbuild >/dev/null || (aws ec2 create-security-group --group-name archbuild --description archbuild > /dev/null && aws ec2 authorize-security-group-ingress --group-name archbuild --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null)
+        aws ec2 describe-security-groups --group-names $name >/dev/null || (aws ec2 create-security-group --group-name $name --description $name > /dev/null && aws ec2 authorize-security-group-ingress --group-name $name --protocol tcp --port 22 --cidr 0.0.0.0/0 > /dev/null)
         [ "$spot" = "true" ] && market_options="--instance-market-options file://$spot_options_path"
         msg "Creating instance..."
-        iid=$(aws ec2 run-instances --image-id $ami --instance-type $itype --count 1 --key-name archbuild --security-groups archbuild --query 'Instances[0].InstanceId' $market_options --output text)
+        iid=$(aws ec2 run-instances --image-id $ami --instance-type $itype --count 1 --key-name $name --security-groups $name --query 'Instances[0].InstanceId' $market_options --output text)
         msg "Waiting for instance to start..."
         while true; do
                 state=$(aws ec2 describe-instances --filter Name=instance-id,Values=$iid --query 'Reservations[*].Instances[*].State.Name' --output text)
@@ -117,10 +118,10 @@ function connect_docker() {
 function build_and_download() {
         msg "Building packages..."
         local makeflags="-j$(($vcpus*2))"
-        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name archbuild nikicat/archbuild $args
+        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name $name nikicat/archbuild $args
         msg "Downloading packages..."
         tmp_dir=$(mktemp -d)
-        docker cp archbuild:/packages $tmp_dir
+        docker cp $name:/packages $tmp_dir
         msg "Terminating instance..."
         aws ec2 terminate-instances --instance-id=$iid > /dev/null
         iid=
