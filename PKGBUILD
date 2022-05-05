@@ -8,13 +8,13 @@
 
 # Maintainer: Nikolay Bryskin <nbryskin@gmail.com>
 pkgname=archbuilder-git
-pkgver=r3.9f0098c
+pkgver=r5.d57d73c
 pkgrel=1
 pkgdesc="Build AUR packages on EC2"
 url="https://github.com/nikicat/archbuilder"
 arch=('any')
 license=('GPL')
-depends=(aws-cli-v2 docker)
+depends=(aws-cli-v2 docker openssh)
 source=('git+https://github.com/nikicat/archbuilder')
 sha256sums=('SKIP')
 

@@ -6,6 +6,8 @@ ami="${AMI:-ami-08056d04e24f84e34}"  # amzn2-ami-ecs-hvm-2.0.20220421-x86_64-ebs
 spot=true
 install=y
 vcpus=32
+sshkey=~/.local/archbuild/ssh.pem
+sockpath=~/.local/archbuild/docker.sock
 
 export AWS_PAGER=""
 
@@ -57,9 +59,8 @@ function parse_args() {
 }
 
 function cleanup() {
-        #jobs %_spinner 2>/dev/null && kill %_spinner && wait %_spinner || true
-        [ "$tmp_dir" != "" ] && rm -r "$tmp_dir"
-        [ -e docker.sock ] && rm docker.sock
+        rm -rf "$tmp_dir"
+        rm -f "$sockpath"
         if [ "$iid" != "" ]; then
                 warning "emergency terminating instance..."
                 aws ec2 terminate-instances --instance-id=$iid > /dev/null
@@ -75,11 +76,16 @@ function cleanup() {
 }
 
 function setup_keypair() {
-        if [ ! -e ssh.pem ]; then
+        mkdir -p "$(dirname $sshkey)"
+        if [ ! -e "$sshkey" ]; then
+                if aws ec2 describe-key-pairs --key-names archbuild >/dev/null; then
+                        msg "Deleting old keypair..."
+                        aws ec2 delete-key-pair --key-name archbuild >/dev/null
+                fi
                 msg "Creating keypair..."
-                aws ec2 create-key-pair --key-name archbuild --query KeyMaterial --output text > ssh.pem
+                aws ec2 create-key-pair --key-name archbuild --query KeyMaterial --output text > "$sshkey"
+                chmod go-rwx "$sshkey"
         fi
-        chmod go-rwx ssh.pem
 }
 
 function run_instance() {
@@ -101,9 +107,10 @@ function run_instance() {
 
 function connect_docker() {
         msg "Connecting ssh..."
-        [ -e docker.sock ] && rm docker.sock
-        ssh -i ./ssh.pem -fNT -L./docker.sock:/run/docker.sock -o "StrictHostKeyChecking no" -o "ExitOnForwardFailure yes" -o "ConnectionAttempts 5" -o "LogLevel ERROR" ec2-user@$dns
-        export DOCKER_HOST=unix://./docker.sock
+        mkdir -p "$(dirname $sockpath)"
+        [ -e $sockpath ] && rm $sockpath
+        ssh -i "$sshkey" -fNT -L$sockpath:/run/docker.sock -o "StrictHostKeyChecking no" -o "ExitOnForwardFailure yes" -o "ConnectionAttempts 5" -o "LogLevel ERROR" ec2-user@$dns
+        export DOCKER_HOST=unix://$sockpath
 }
 
 function build_and_download() {
@@ -111,7 +118,7 @@ function build_and_download() {
         local makeflags="-j$(($vcpus*2))"
         docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name archbuild nikicat/archbuild $args
         msg "Downloading packages..."
-        tmp_dir=$(mktemp -d -p ./)
+        tmp_dir=$(mktemp -d)
         docker cp archbuild:/packages $tmp_dir
         msg "Terminating instance..."
         aws ec2 terminate-instances --instance-id=$iid > /dev/null
@@ -119,7 +126,7 @@ function build_and_download() {
         if [ "$install" = y ]; then
                 sudo pacman -U $tmp_dir/packages/*
         fi
-        mv $tmp_dir/packages/* ./packages
+        mv $tmp_dir/packages/* ./
 }
 
 colorize
