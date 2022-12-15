@@ -54,7 +54,7 @@ function parse_args() {
         itype=c5a.$(($vcpus/4))xlarge
         [ $itype = c5a.1xlarge ] && itype=c5a.xlarge
         args="$@"
-        if [ $args = "" ]; then
+        if [ "$args" = "" ]; then
                 print_usage
                 exit 1
         fi
@@ -121,7 +121,7 @@ function connect_docker() {
 function build_and_download() {
         msg "Building packages..."
         local makeflags="-j$(($vcpus*2))"
-        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name $name nikicat/archbuild $args
+        docker run -ti --tmpfs=/build:exec --env MAKEFLAGS=$makeflags --name $name nikicat/archbuild@sha256:3e2219bdf400101863fb9986ddf6f43c87ed1675c81032e6d322bb0b6f54f88d $args
         msg "Downloading packages..."
         tmp_dir=$(mktemp -d)
         docker cp $name:/packages $tmp_dir
