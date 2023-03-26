@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+if [ "$1" = "-U" ]; then
+  pkgname=$(basename $(dirname ${@: -1}))
+  [ "$pkgname" = "$PKGNAME" ] && exit
+fi
+exec /usr/bin/pacman "$@"
