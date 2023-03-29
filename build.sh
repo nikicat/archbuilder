@@ -3,6 +3,7 @@
 echo "MAKEFLAGS='$MAKEFLAGS'" | sudo tee -a /etc/makepkg.conf >/dev/null
 sudo chown builduser /build
 exec 3>&1 4>&2
+git config --global --add protocol.file.allow always
 TIMEFORMAT=%P
 yaycmd="yay --nodiffmenu --nocleanmenu --noeditmenu --noupgrademenu --noremovemake --sudoflags -E -Sy --builddir /build"
 util=$({ time tr "\0" "\n" < /dev/zero | PKGNAME=$1 $yaycmd "$@" 1>&3 2>&4 ; } 2>&1)
